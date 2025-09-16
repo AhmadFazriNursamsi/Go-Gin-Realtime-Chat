@@ -1,0 +1,19 @@
+# Ignore binary & cache
+bin/
+*.exe
+*.log
+
+# Ignore dependency cache
+vendor/
+
+# Ignore uploads folder
+uploads/
+
+# Ignore environment/config file
+.env
+
+# Ignore OS/system files
+.DS_Store
+Thumbs.db
+go.sum
+go.mod
