@@ -5,5 +5,4 @@ type RoleChild struct {
 	Name   string `json:"name"`
 	RoleID uint   `json:"role_id"`
 	Role   Role   `json:"-"` // Relasi ke Role
-
 }

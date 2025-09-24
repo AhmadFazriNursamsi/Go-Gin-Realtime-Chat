@@ -1,0 +1,144 @@
+definitions:
+  controllers.ErrorResponse:
+    properties:
+      message:
+        example: Email atau username tidak ditemukan
+        type: string
+    type: object
+  controllers.ErrorResponses:
+    properties:
+      message:
+        example: Email atau username tidak ditemukan
+        type: string
+    type: object
+  controllers.LoginInput:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  controllers.token:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+        type: string
+    type: object
+  controllers.tokens:
+    properties:
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+        type: string
+    type: object
+  models.Role:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      rolechild:
+        items:
+          $ref: '#/definitions/models.RoleChild'
+        type: array
+    type: object
+  models.RoleChild:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      role_id:
+        type: integer
+    type: object
+  models.User:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      photo:
+        description: "\U0001F195 untuk simpan path file"
+        type: string
+      role:
+        $ref: '#/definitions/models.Role'
+      role_id:
+        description: boleh null
+        type: integer
+      roleChild:
+        $ref: '#/definitions/models.RoleChild'
+      rolechild_id:
+        description: boleh null
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login untuk mendapatkan JWT token
+      parameters:
+      - description: Login
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controllers.tokens'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controllers.ErrorResponses'
+      security:
+      - Bearer: []
+      summary: Login user
+      tags:
+      - Auth
+  /users/with-permissions:
+    get:
+      consumes:
+      - application/json
+      description: get user info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.User'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.User'
+      security:
+      - Bearer: []
+      summary: Profile user
+      tags:
+      - users
+securityDefinitions:
+  Bearer:
+    description: Masukkan token JWT dalam format 'Bearer <token>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

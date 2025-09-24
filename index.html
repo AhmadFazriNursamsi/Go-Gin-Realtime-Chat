@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtime Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f7f7f7;
+      margin: 0;
+      height: 100vh;
+    }
+    h1 { margin: 10px 0; }
+    #room-selector { display: flex; gap: 8px; margin-bottom: 8px; align-items:center; }
+    select { padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+    #chat-box {
+      display: flex; flex-direction: column;
+      width: 90%; max-width: 600px; padding: 10px;
+      overflow-y: auto; background: white; border: 1px solid #ddd;
+      border-radius: 8px; flex: 1;
+    }
+    #chat-box li { list-style: none; margin: 6px 0; max-width: 70%;
+      padding: 8px 12px; border-radius: 12px; font-size: 14px; word-wrap: break-word;
+    }
+    #chat-box li.self { background-color: #2563eb; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; }
+    #chat-box li.other { background-color: #e5e7eb; color: black; align-self: flex-start; margin-right: auto; border-bottom-left-radius: 0; }
+    #controls { display: flex; width: 90%; max-width: 600px; gap: 8px; padding: 10px; }
+    input, button { padding: 10px; font-size: 16px; }
+    input { flex: 1; border-radius: 6px; border: 1px solid #ccc; }
+    button { background: #007bff; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    #status { font-size: 14px; color: gray; margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <h1>Realtime Chat</h1>
+  <div id="status">🔴 Connecting...</div>
+
+  <div id="room-selector">
+    <label for="rooms">Room:</label>
+    <select id="rooms"></select>
+    <div id="new-msg-badge" style="color:#e11; font-size:13px; margin-left:8px;"></div>
+  </div>
+
+  <ul id="chat-box"></ul>
+  <div id="controls">
+    <input id="msg" type="text" placeholder="Ketik pesan..." onkeydown="if(event.key==='Enter'){sendMessage()}">
+    <button onclick="sendMessage()">Kirim</button>
+  </div>
+
+<script>
+const token = prompt("Masukkan token JWT (bisa dummy):", "USER_123");
+const ws = new WebSocket(`ws://localhost:8082/ws?token=${token}`);
+const chatBox = document.getElementById("chat-box");
+const statusEl = document.getElementById("status");
+const roomSelect = document.getElementById("rooms");
+const badgeEl = document.getElementById("new-msg-badge");
+
+// parse JWT safely (may be dummy)
+function parseJwt(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    return JSON.parse(atob(parts[1]));
+  } catch (e) {
+    console.warn("Gagal decode token:", e);
+    return null;
+  }
+}
+
+const payload = parseJwt(token) || {};
+const currentUser = payload?.name || payload?.email || payload?.sub || "Unknown";
+const usersid = payload?.id || payload?.sub || null;
+
+// messages cache per room: { roomId: [msgObj, ...] }
+const messagesByRoom = {};
+
+// rooms list from token (try multiple field name variants)
+let rooms = [];
+if (Array.isArray(payload?.RoomsId)) rooms = payload.RoomsId;
+else if (Array.isArray(payload?.rooms_id)) rooms = payload.rooms_id;
+else if (payload?.RoomsId) rooms = [payload.RoomsId];
+else if (payload?.room_id) rooms = [payload.room_id];
+
+if (rooms.length === 0) {
+  // fallback: default room 1
+  rooms = [1];
+}
+let currentRoom = rooms[0];
+let unreadCounts = {}; // track unread per room
+
+function populateRooms() {
+  roomSelect.innerHTML = "";
+  rooms.forEach(r => {
+    const opt = document.createElement("option");
+    opt.value = r;
+    opt.textContent = `Room ${r}`;
+    roomSelect.appendChild(opt);
+    // ensure cache entry exists
+    if (!messagesByRoom[r]) messagesByRoom[r] = [];
+    if (!unreadCounts[r]) unreadCounts[r] = 0;
+  });
+  roomSelect.value = currentRoom;
+  renderRoomMessages(currentRoom);
+  updateBadge();
+}
+
+function updateBadge() {
+  const totalUnread = rooms.reduce((acc, r) => acc + (unreadCounts[r] || 0), 0);
+  badgeEl.textContent = totalUnread > 0 ? `🔔 ${totalUnread} new` : "";
+}
+
+function renderRoomMessages(roomId) {
+  chatBox.innerHTML = "";
+  const arr = messagesByRoom[roomId] || [];
+  for (const message of arr) {
+    appendMessageToDOM(message, /*scroll*/ false);
+  }
+  chatBox.scrollTop = chatBox.scrollHeight;
+  // reset unread for this room
+  unreadCounts[roomId] = 0;
+  updateBadge();
+}
+
+function appendMessageToDOM(message, scroll=true) {
+  const senderName = message.sender_name || `User#${message.sender_id}`;
+  const li = document.createElement("li");
+  li.textContent = `${senderName}: ${message.content}`;
+  // compare loosely because types could be string/number
+  if (message.sender_id == usersid) {
+    li.classList.add("self");
+  } else {
+    li.classList.add("other");
+  }
+  chatBox.appendChild(li);
+  if (scroll) chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+roomSelect.addEventListener("change", () => {
+  currentRoom = parseInt(roomSelect.value);
+  renderRoomMessages(currentRoom);
+});
+
+// init UI rooms from token
+populateRooms();
+
+ws.onopen = () => {
+  statusEl.textContent = "🟢 Connected as " + currentUser;
+  console.log("Connected. Current User:", payload);
+};
+
+ws.onclose = () => {
+  statusEl.textContent = "🔴 Disconnected";
+};
+
+// handle incoming messages: always cache per-room, render only if active
+ws.onmessage = (event) => {
+  let message;
+  try {
+    message = JSON.parse(event.data);
+  } catch (e) {
+    console.warn("Invalid JSON from server:", event.data);
+    return;
+  }
+
+  // handle system message from server (rooms info, active room, etc)
+  if (message.type === "system") {
+    if (Array.isArray(message.rooms)) {
+      rooms = message.rooms;
+      // ensure typed numbers
+      rooms = rooms.map(r => Number(r));
+    }
+    if (message.activeRoom) {
+      currentRoom = Number(message.activeRoom);
+    }
+    // init caches for each room
+    rooms.forEach(r => { if (!messagesByRoom[r]) messagesByRoom[r] = []; if (!unreadCounts[r]) unreadCounts[r] = 0; });
+    populateRooms();
+    // if server included any initial data in system, ignore for now
+    return;
+  }
+
+  // normal chat message
+  const rid = Number(message.room_id || message.roomId || message.room || 0);
+  if (!messagesByRoom[rid]) messagesByRoom[rid] = [];
+  messagesByRoom[rid].push(message);
+
+  // if message belongs to currentRoom -> render, else increment unread
+  if (rid === Number(currentRoom)) {
+    appendMessageToDOM(message);
+  } else {
+    unreadCounts[rid] = (unreadCounts[rid] || 0) + 1;
+    updateBadge();
+  }
+};
+
+// send message
+function sendMessage() {
+  const input = document.getElementById("msg");
+  if (!input.value) return;
+
+  console.log("[DEBUG] sendMessage:", {
+    usersid,
+    currentRoom,
+    content: input.value
+  });
+
+  ws.send(JSON.stringify({
+    type: "message",
+    sender_id: usersid,
+    room_id: currentRoom,
+    content: input.value
+  }));
+
+  input.value = "";
+}
+
+
+// optional: request history for current room (if server supports fetch_history)
+function requestHistory(roomId) {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "fetch_history", room_id: roomId }));
+  }
+}
+
+// when user switches to a room with empty cache, optionally request history:
+roomSelect.addEventListener("change", () => {
+  const rid = Number(roomSelect.value);
+  if ((messagesByRoom[rid] || []).length === 0) {
+    // try asking server for history if implemented
+    requestHistory(rid);
+  }
+});
+
+</script>
+</body>
+</html>

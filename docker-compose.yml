@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  gochat_app:
+    build: .
+    container_name: gochat_app
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DB_HOST: host.docker.internal
+      DB_USER: postgres
+      DB_PASSWORD: Fazri18
+      DB_NAME: testing
+      DB_PORT: "5432"
+      REDIS_ADDR: redis:6379 # nama service Redis
+      JWT_SECRET: "0WvRtY6h9V7qCrMm6KDxjD3c6nQFlQ0gTK9r4ggh7LM="
+    ports:
+      - "8082:8082"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_golang
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Fazri18
+      POSTGRES_DB: testing
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:alpine
+    container_name: redisAtep
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:

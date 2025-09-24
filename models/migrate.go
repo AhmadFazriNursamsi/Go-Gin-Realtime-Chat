@@ -7,5 +7,9 @@ func Migrate(db *gorm.DB) error {
 		&Role{},
 		&RoleChild{},
 		&User{},
+		&Permission{},
+		&RolePermission{},
+		&Rooms{},
+		&Messages{},
 	)
 }
