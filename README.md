@@ -1,41 +1,45 @@
-# Go Gin Realtime Chat
+# 💬 Go Gin Realtime Chat
 
-Aplikasi chat real-time berbasis **Go** dan **Gin Framework**, memanfaatkan WebSocket untuk komunikasi langsung antar klien. Dilengkapi dengan backend, routing, dan contoh client minimal.
+Proyek ini adalah aplikasi **Realtime Chat** berbasis **Go (Gin Framework)** dengan dukungan:
+
+- 🔑 **JWT Authentication**  
+- 🗄 **PostgreSQL + GORM** untuk manajemen user, role, permission, dan pesan  
+- ⚡ **Redis (Pub/Sub)** untuk distribusi pesan lintas instance  
+- 🌐 **WebSocket** untuk komunikasi real-time  
+- 📑 **Swagger Docs** untuk dokumentasi API  
+- 🛡 **Graceful shutdown** & signal handling  
 
 ---
 
 ## 🚀 Fitur Utama
 
-- Komunikasi real-time dengan WebSocket  
-- Routing dan pengelolaan pesan dengan Gin  
-- Struktur modular: `controllers`, `routes`, `middlewares`, `models`, `utils`  
-- Mendukung deployment via Docker + `docker-compose`  
-- Contoh client HTML sederhana untuk testing  
+- **Autentikasi dengan JWT** (login menghasilkan token, digunakan untuk akses API & WebSocket)  
+- **Manajemen User, Role, Permission** via API  
+- **Chat Real-time** dengan WebSocket  
+- **Redis Pub/Sub** untuk broadcasting pesan ke semua client di berbagai server  
+- **Swagger UI** untuk eksplorasi API di `http://localhost:8082/swagger/index.html`  
 
 ---
 
-## 📁 Struktur Proyek
+## 📂 Struktur Project
 
-```
+```bash
 Go-Gin-Realtime-Chat/
-├── controllers/      # Logic pengelolaan WebSocket & request
-├── middlewares/      # Middleware (misal auth, CORS)
-├── models/           # Model data (pesan, user, etc)
-├── routes/           # Definisi route API / WebSocket
-├── utils/            # Helper, utilitas
-├── docs/             # Dokumentasi / spesifikasi API (jika ada)
-├── docker-compose.yml
+├── database/         # Koneksi DB
+├── docs/             # Swagger docs
+├── models/           # User, Role, Permission, Message, dll
+├── routes/           # Routing untuk Auth, User, Role, Permission
+├── main.go           # Entry point
+├── hub.go            # Hub untuk WebSocket
+├── client.go         # Client handler
 ├── Dockerfile
-├── main.go
-├── hub.go             # manajemen WebSocket hub
-├── client.go          # contoh client Go (opsional)
-├── index.html         # contoh client berbasis browser
-└── .gitignore
+├── docker-compose.yml
+└── .env.example
 ```
 
 ---
 
-## ⚙️ Instalasi & Jalankan
+## ⚙️ Installation
 
 ### 1. Clone Repo
 ```bash
@@ -43,55 +47,81 @@ git clone https://github.com/AhmadFazriNursamsi/Go-Gin-Realtime-Chat.git
 cd Go-Gin-Realtime-Chat
 ```
 
-### 2. Install dependencies
-```bash
-go mod tidy
+### 2. Setup `.env`
+Buat file `.env` berdasarkan `.env.example`:
+```env
+APP_PORT=8082
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=chatdb
+JWT_SECRET=supersecret
+REDIS_ADDR=localhost:6379
 ```
 
-### 3. (Opsional) Setup `.env` kalau ada variabel konfigurasi (misalnya port, DB, dsb)  
-Buat `.env` berdasarkan contoh jika ada file `.env.example`.
-
-### 4. Jalankan aplikasi
-```bash
-go run main.go
-```
-
-Atau jika kamu menggunakan Docker + docker-compose:
+### 3. Jalankan dengan Docker Compose
 ```bash
 docker-compose up --build
 ```
 
 ---
 
-## 🔌 Endpoint & Contoh Penggunaan
+## 🔌 API Endpoints
 
-- `GET /` → Menampilkan halaman client (HTML) untuk chat  
-- WebSocket endpoint (misalnya `/ws`) → Untuk koneksi real-time  
-- Kirim / terima pesan antar klien  
+### Auth
+- `POST /auth/login` → Login user, return JWT  
+- `POST /auth/register` → Register user  
 
-Contoh client sederhana disertakan: `index.html`  
-Buka di browser dan sambungkan ke server WebSocket untuk mencoba.
+### User
+- `GET /users` → List users  
+- `GET /users/me` → Info user dari token  
+
+### Role & Permission
+- `POST /roles` → Tambah role  
+- `POST /permissions` → Tambah permission  
+- `POST /role-permissions` → Assign permission ke role  
+
+### WebSocket
+- `GET /ws?token=<JWT>` → Connect WebSocket untuk chat  
+
+---
+
+## 📡 Contoh WebSocket
+
+Connect dengan query param token JWT:
+
+```javascript
+let ws = new WebSocket("ws://localhost:8082/ws?token=Bearer <your_jwt>");
+ws.onmessage = (msg) => console.log("📩", msg.data);
+ws.send(JSON.stringify({ room_id: 1, content: "Halo semua!" }));
+```
+
+---
+
+## 📑 Swagger Docs
+
+Setelah server berjalan, buka:  
+👉 [http://localhost:8082/swagger/index.html](http://localhost:8082/swagger/index.html)  
 
 ---
 
 ## 🧪 Testing
 
-Coba buka beberapa tab browser ke `index.html`, kirim pesan dari satu tab → pesan muncul di semua tab lain.
+Gunakan **Postman** atau **cURL**:
 
-Bisa juga menggunakan client websocket Go (`client.go`) sebagai simulasi klien.
+```bash
+# Register user
+curl -X POST http://localhost:8082/auth/register   -H "Content-Type: application/json"   -d '{"name":"Fazri","email":"fazri@example.com","password":"123456"}'
+
+# Login
+curl -X POST http://localhost:8082/auth/login   -H "Content-Type: application/json"   -d '{"email":"fazri@example.com","password":"123456"}'
+```
+
+Gunakan JWT yang didapat untuk connect ke WebSocket.
 
 ---
 
-## 📝 Catatan Pengembangan
+## 📜 License
 
-- Pastikan port WebSocket tidak bertabrakan  
-- Kelola hub/client connection dengan baik agar tidak ada memory leak  
-- Jika ingin menambahkan auth, cukup tambahkan middleware JWT sebelum upgrade ke WebSocket  
-- Untuk skala besar, pertimbangkan Redis Pub/Sub agar WebSocket bisa horizontal scale  
-
----
-
-## 📜 Lisensi
-
-Aplikasi ini dirilis di bawah lisensi **MIT License**.  
-(Masukkan file `LICENSE` di root repo)
+Proyek ini dirilis di bawah lisensi [MIT License](LICENSE).  
